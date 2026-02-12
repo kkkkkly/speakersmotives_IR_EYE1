@@ -1,9 +1,46 @@
 
 ############################Data loading############################
 ## 0. Data loading
+library(lme4)
+library(MASS)
+library(lmerTest)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(psych)
+library(purrr)
+library(rlist)
+rename <- dplyr::rename
+
 cleaned_data <- read.csv("cleaned_data.csv",header = T, encoding = "UTF-8")
 
 scales <- read.csv("scales.csv",header = T, encoding = "UTF-8")
+
+cleaned_data <- cleaned_data %>% mutate(Subject=as.factor(Subject),Item=as.factor(Item),Trial=as.factor(Trial),
+                                        Implicature=factor(Implicature, levels = c("-1","1")),
+                                        FT_FB=factor(FT_FB, levels = c("-1","1")),
+                                        Target=factor(Target, levels = c("-1","1")),
+                                        Indirectness=factor(Indirectness, levels = c("0","1")),
+                                        ACC=as.integer(ACC),SCR_Latency=as.numeric(SCR_Latency),
+                                        SCR_Mean=as.numeric(SCR_Mean),IA1_SKIP=as.integer(IA1_SKIP),
+                                        IA1_FIRST_FIXATION_DURATION=as.numeric(IA1_FIRST_FIXATION_DURATION),
+                                        IA1_GAZE_DURATION=as.numeric(IA1_GAZE_DURATION),
+                                        IA1_SECOND_PASS_READING_TIME=as.numeric(IA1_SECOND_PASS_READING_TIME),
+                                        IA1_REGRESSION_IN=as.integer(IA1_REGRESSION_IN),
+                                        IA1_TOTAL_READING_TIME=as.numeric(IA1_TOTAL_READING_TIME),
+                                        IA2_SKIP=as.integer(IA2_SKIP),
+                                        IA2_FIRST_FIXATION_DURATION=as.numeric(IA2_FIRST_FIXATION_DURATION),
+                                        IA2_GAZE_DURATION=as.numeric(IA2_GAZE_DURATION),
+                                        IA2_SECOND_PASS_READING_TIME=as.numeric(IA2_SECOND_PASS_READING_TIME),
+                                        IA2_REGRESSION_IN=as.integer(IA2_REGRESSION_IN),
+                                        IA2_TOTAL_READING_TIME=as.numeric(IA2_TOTAL_READING_TIME))
+
+contrasts(cleaned_data$FT_FB) <- c(-0.5, 0.5)
+contrasts(cleaned_data$Target) <- c(-0.5, 0.5)
+contrasts(cleaned_data$Indirectness) <- c(-0.5, 0.5)
+
+scales <- scales %>% mutate(Subject=as.factor(Subject),CSF=as.integer(CSF),PT=as.integer(PT),
+                            FS=as.integer(FS),EC=as.integer(EC),PD=as.integer(PD),IRI=as.integer(IRI))
 
 ############################1. Behavioural--ACC############################
 
@@ -41,13 +78,13 @@ confint(EDAMean_model, method = "Wald")
 ### 2.2.1 Interaction follow-ups: Target
 EDA_sim_Self_FTFB <- lmer(log(SCR_Mean) ~ Indirectness*FT_FB +
                             (1|Subject),
-                          data =cleaned_data[which(cleaned_data$Target == "-1"),])
+                          data =cleaned_data[which(cleaned_data$Target == "1"),])
 a <- summary(EDA_sim_Self_FTFB)
 summary(EDA_sim_Self_FTFB)
 
 EDA_sim_Other_FTFB <- lmer(log(SCR_Mean) ~ Indirectness*FT_FB +
                              (1 |Subject),
-                           data =cleaned_data[which(cleaned_data$Target == "1"),])
+                           data =cleaned_data[which(cleaned_data$Target == "-1"),])
 b <- summary(EDA_sim_Other_FTFB)
 summary(EDA_sim_Other_FTFB)
 
@@ -55,20 +92,20 @@ summary(EDA_sim_Other_FTFB)
 
 EDA_sim_FT_Self <- lmer(log(SCR_Mean) ~ Indirectness + (1|Subject),
                         data =cleaned_data[which(cleaned_data$FT_FB == "-1" &
-                                                   cleaned_data$Target == "-1"),])
+                                                   cleaned_data$Target == "1"),])
 e <- summary(EDA_sim_FT_Self)
 summary(EDA_sim_FT_Self)
 
 EDA_sim_FB_Self <- lmer(log(SCR_Mean) ~ Indirectness + (1|Subject),
                         data =cleaned_data[which(cleaned_data$FT_FB == "1" &
-                                                   cleaned_data$Target == "-1"),])
+                                                   cleaned_data$Target == "1"),])
 g <- summary(EDA_sim_FB_Self)
 summary(EDA_sim_FB_Self)
 
 
 EDA_sim_FT_Other <- lmer(log(SCR_Mean) ~ Indirectness + (1 |Subject),
                          data =cleaned_data[which(cleaned_data$FT_FB == "-1" &
-                                                    cleaned_data$Target == "1"),])
+                                                    cleaned_data$Target == "-1"),])
 f <- summary(EDA_sim_FT_Other)
 summary(EDA_sim_FT_Other)
 confint(EDA_sim_FT_Other, method = "profile")
@@ -76,7 +113,7 @@ confint(EDA_sim_FT_Other, method = "profile")
 
 EDA_sim_FB_Other <- lmer(log(SCR_Mean) ~ Indirectness + (1|Subject),
                          data =cleaned_data[which(cleaned_data$FT_FB == "1" &
-                                                    cleaned_data$Target == "1"),])
+                                                    cleaned_data$Target == "-1"),])
 h <- summary(EDA_sim_FB_Other)
 summary(EDA_sim_FB_Other)
 p.adjust(c(e[[10]][2,"Pr(>|t|)"],
@@ -98,25 +135,27 @@ SCR_Mean_sub1$SCR_Mean_diff <- SCR_Mean_sub1$`1` - SCR_Mean_sub1$`0`
 SCR_cor <- left_join(SCR_Mean_sub1[,c(1:3,6)],scales, by = "Subject")
 
 SCR_cor_stats <- rbind(cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'SCR_Mean_diff'],
-                             SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'IRI'], method = "pearson")[[3]],
+                             SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'IRI'], method = "pearson")[[4]],
                     cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'SCR_Mean_diff'],
-                             SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'IRI'], method = "pearson")[[4]]),
+                             SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==1),'IRI'], method = "pearson")[[3]]),
                     cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'IRI'], method = "pearson")[[3]],
+                                   SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'IRI'], method = "pearson")[[4]],
                           cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'IRI'], method = "pearson")[[4]]),
+                                   SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'IRI'], method = "pearson")[[3]]),
                     cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'IRI'], method = "pearson")[[3]],
+                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'IRI'], method = "pearson")[[4]],
                           cor.test(SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'IRI'], method = "pearson")[[4]]),
+                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==1),'IRI'], method = "pearson")[[3]]),
                     cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'CSF'], method = "pearson")[[3]],
+                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'CSF'], method = "pearson")[[4]],
                           cor.test(SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'CSF'], method = "pearson")[[4]]))
+                                   SCR_cor[which(SCR_cor$FT_FB==1&SCR_cor$Target==-1),'CSF'], method = "pearson")[[3]]))
 
+colnames(SCR_cor_stats) <- c("R","p")
+rownames(SCR_cor_stats) <- c("FT_Self","FT_Other","FB_Self","FB_Other")
 SCR_cor_stats
 
-p.adjust(SCR_cor_stats[,1], method = "fdr")
+p.adjust(SCR_cor_stats[,2], method = "fdr")
 
 ols <- lm(SCR_Mean_diff~IRI,data = SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),])
 summary(ols)
@@ -127,22 +166,24 @@ summary(rrhuber)
 sfsmisc::f.robftest(rrhuber, var = "IRI")
 
 SCR_cor_stats_subscale <- rbind(cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                         SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PT'], method = "pearson")[[3]],
+                                         SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PT'], method = "pearson")[[4]],
                                 cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                         SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PT'], method = "pearson")[[4]]),
+                                         SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PT'], method = "pearson")[[3]]),
                                 cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'FS'], method = "pearson")[[3]],
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'FS'], method = "pearson")[[4]],
                                       cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'FS'], method = "pearson")[[4]]),
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'FS'], method = "pearson")[[3]]),
                                 cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'EC'], method = "pearson")[[3]],
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'EC'], method = "pearson")[[4]],
                                       cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'EC'], method = "pearson")[[4]]),
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'EC'], method = "pearson")[[3]]),
                                 cbind(cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PD'], method = "pearson")[[3]],
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PD'], method = "pearson")[[4]],
                                       cor.test(SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'SCR_Mean_diff'],
-                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PD'], method = "pearson")[[4]])
+                                               SCR_cor[which(SCR_cor$FT_FB==-1&SCR_cor$Target==-1),'PD'], method = "pearson")[[3]])
                                 )
+rownames(SCR_cor_stats_subscale) <- c("PT","FS","EC","PD")
+colnames(SCR_cor_stats_subscale) <- c("R","p")
 SCR_cor_stats_subscale
 
 ############################3. IA1############################
@@ -199,13 +240,13 @@ confint(IA1_RI_Model, method = "Wald")
 
 ##3.4.1 interaction
 IA1_RI_sim_Self <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature  + (1|Subject)+(1 |Item),
-                         data =cleaned_data[which(cleaned_data$Target == "-1"),], family = binomial)
+                         data =cleaned_data[which(cleaned_data$Target == "1"),], family = binomial)
 
 a <- summary(IA1_RI_sim_Self)
 summary(IA1_RI_sim_Self)
 
 IA1_RI_sim_Other <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature + (1+Indirectness|Subject)+(1 +Indirectness|Item),
-                          data =cleaned_data[which(cleaned_data$Target == "1"),], family = binomial)
+                          data =cleaned_data[which(cleaned_data$Target == "-1"),], family = binomial)
 b <- summary(IA1_RI_sim_Other)
 summary(IA1_RI_sim_Other)
 
@@ -227,17 +268,20 @@ IA1_RI_per_Sub1$IA1_RI_diff <- IA1_RI_per_Sub1$`1` - IA1_RI_per_Sub1$`0`
 IA1_RI_cor <- left_join(IA1_RI_per_Sub1[,c(1,2,5)],scales, by = "Subject")
 
 IA1_RI_cor_stats <- rbind(cbind(cor.test(IA1_RI_cor[which(IA1_RI_cor$Target==1),'IA1_RI_diff'],
-                                         IA1_RI_cor[which(IA1_RI_cor$Target==1),'CSF'], method = "pearson")[[3]],
+                                         IA1_RI_cor[which(IA1_RI_cor$Target==1),'CSF'], method = "pearson")[[4]],
                                 cor.test(IA1_RI_cor[which(IA1_RI_cor$Target==1),'IA1_RI_diff'],
-                                         IA1_RI_cor[which(IA1_RI_cor$Target==1),'CSF'], method = "pearson")[[4]]),
+                                         IA1_RI_cor[which(IA1_RI_cor$Target==1),'CSF'], method = "pearson")[[3]]),
                        cbind(cor.test(IA1_RI_cor[which(IA1_RI_cor$Target==-1),'IA1_RI_diff'],
-                                      IA1_RI_cor[which(IA1_RI_cor$Target==-1),'CSF'], method = "pearson")[[3]],
+                                      IA1_RI_cor[which(IA1_RI_cor$Target==-1),'CSF'], method = "pearson")[[4]],
                              cor.test(IA1_RI_cor[which(IA1_RI_cor$Target==-1),'IA1_RI_diff'],
-                                      IA1_RI_cor[which(IA1_RI_cor$Target==-1),'CSF'], method = "pearson")[[4]]))
+                                      IA1_RI_cor[which(IA1_RI_cor$Target==-1),'CSF'], method = "pearson")[[3]]))
+
+colnames(IA1_RI_cor_stats) <- c("R","p")
+rownames(IA1_RI_cor_stats) <- c("Self","Other")
 
 IA1_RI_cor_stats
 
-p.adjust(SCR_cor_stats[,1], method = "fdr")
+p.adjust(IA1_RI_cor_stats[,2], method = "fdr")
 
 ####Total Reading####
 IA1_TR_Model <- lmer(log(IA1_TOTAL_READING_TIME) ~ FT_FB * Target * Indirectness + Implicature +
