@@ -239,13 +239,13 @@ summary(IA1_RI_Model)
 confint(IA1_RI_Model, method = "Wald")
 
 ##3.4.1 interaction
-IA1_RI_sim_Self <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature  + (1|Subject)+(1 |Item),
+IA1_RI_sim_Self <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature  + (1+Indirectness|Subject)+(1 +Indirectness|Item),
                          data =cleaned_data[which(cleaned_data$Target == "1"),], family = binomial)
 
 a <- summary(IA1_RI_sim_Self)
 summary(IA1_RI_sim_Self)
 
-IA1_RI_sim_Other <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature + (1+Indirectness|Subject)+(1 +Indirectness|Item),
+IA1_RI_sim_Other <- glmer(IA1_REGRESSION_IN ~ Indirectness + Implicature + (1|Subject)+(1 |Item),
                           data =cleaned_data[which(cleaned_data$Target == "-1"),], family = binomial)
 b <- summary(IA1_RI_sim_Other)
 summary(IA1_RI_sim_Other)
@@ -354,3 +354,4 @@ summary(lmer(log(IA2_TOTAL_READING_TIME) ~ FT_FB * Target * Indirectness + Impli
                (1+Indirectness |Subject)+
                (1+Indirectness  |Item),
              data =cleaned_data, control = lmerControl(optimizer = "bobyqa")))
+
